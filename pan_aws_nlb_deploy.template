@@ -56,11 +56,18 @@
       "MinLength" : "3",
       "MaxLength" : "12"
     },
+    "NLBType": {
+      "Type" : "String",
+      "Description": "Input the type of Network Load Balancer",
+      "Default": "internal",
+      "MinLength" : "3",
+      "MaxLength" : "20"
+    },
     "QueueURL": {
       "Type" : "String",
       "Description": "Enter the name of the External Classic Load Balancer",
       "MinLength" : "3",
-      "MaxLength" : "65"
+      "MaxLength" : "165"
     },
     "SSHLocation" : {
       "Description" : "Restrict SSH access to the VM-Series firewall (by default can be accessed from anywhere)",
