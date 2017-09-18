@@ -275,7 +275,7 @@ def append_nlb_ip_data(nlb_data, nlb_ips):
     :return: 
     """
 
-    ip_list = nlb_ips.split('/n')
+    ip_list = nlb_ips.split('\n')
     print("[append_nlb_ip_data] NLB IP List: {}".format("ip_list"))
 
     az_data = nlb_data.get('AVAIL-ZONES')
