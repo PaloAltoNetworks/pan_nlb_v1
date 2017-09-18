@@ -83,7 +83,7 @@ def create_dynamo_db(table_name):
     :return: 
     """
 
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    dynamodb = boto3.resource('dynamodb')
 
     table = dynamodb.create_table(
         TableName=table_name,
