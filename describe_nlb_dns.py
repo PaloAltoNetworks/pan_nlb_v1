@@ -1,12 +1,12 @@
 import boto3
-import httplib
 import json
 import itertools
 import time
 import logging
-from urlparse import urlparse
-from contextlib import closing
+import sys
 
+sys.path.append('dnslib/')
+import pan_client as dns
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -14,6 +14,7 @@ logger.setLevel(logging.INFO)
 lb_client = boto3.client('elbv2')
 sqs_client = boto3.client('sqs')
 sts_client = boto3.client('sts')
+
 
 def retry(delays=(0, 1, 5, 30),
           exception=Exception,
@@ -117,44 +118,6 @@ def assume_role_and_dispatch(role_arn, data):
     send_to_queue(sqs_resource, data)
 
 
-def create_dynamo_db(table_name):
-    """
-    Create and initialize dynamo db
-    :return: 
-    """
-
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
-
-    table = dynamodb.create_table(
-        TableName=table_name,
-        KeySchema=[
-            {
-                'AttributeName': 'NLB-ARN',
-                'KeyType': 'HASH'  # Partition key
-            },
-            {
-                'AttributeName': 'NLB-NAME',
-                'KeyType': 'RANGE'  # Sort key
-            }
-        ],
-        AttributeDefinitions=[
-            {
-                'AttributeName': 'NLB-ARN',
-                'AttributeType': 'S'
-            },
-            {
-                'AttributeName': 'NLB-NAME',
-                'AttributeType': 'S'
-            },
-
-        ],
-        ProvisionedThroughput={
-            'ReadCapacityUnits': 10,
-            'WriteCapacityUnits': 10
-        }
-    )
-
-
 @retry()
 def db_add_nlb_record(db_item, table_name):
     """
@@ -163,6 +126,7 @@ def db_add_nlb_record(db_item, table_name):
     :return: 
     """
 
+    print("[db_add_nlb_record] Adding item: {}".format(db_item))
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
     table = dynamodb.Table(table_name)
     table.put_item(
@@ -195,6 +159,7 @@ def get_db_entry(key_hash, key_range, table_name):
     :return: 
     """
 
+    print("[get_db_entry] Retrieve items from the db: key_hash: {} key_range: {}".format(key_hash, key_range))
     dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
     table = dynamodb.Table(table_name)
 
@@ -210,6 +175,7 @@ def get_db_entry(key_hash, key_range, table_name):
         print("\n\n The NLB of interest is not found")
         return (False, 2, None)
 
+    print("[get_db_entry] Response from db: {}".format(response))
     if not response.get('Item', None):
         # The case when there are no items in the database
         print("There are no items in the database")
@@ -281,15 +247,61 @@ def handle_nlb_add(nlb_response, table_name):
     :param table_name: 
     :return: 
     """
-
+    print("[handle_nlb_add] NLB details: {}".format(nlb_response))
     db_item = parse_and_create_nlb_data('ADD-NLB', nlb_response)
 
+    nlb_dns = db_item.get('DNS-NAME', None)
+    print("nlb dns name: {}".format(nlb_dns))
+
+    ips = resolve_nlb_ip(nlb_dns)
+    print("[handle_nlb_add] nlb ips: {} type: {}".format(ips, type(ips)))
+
+    final_nlb_data = append_nlb_ip_data(db_item, ips)
+
     # First add it to the database
-    db_add_nlb_record(db_item, table_name)
+    db_add_nlb_record(final_nlb_data, table_name)
 
     # Secondly, send a message out on the queue
-    send_to_queue(db_item)
+    send_to_queue(final_nlb_data)
 
+
+def append_nlb_ip_data(nlb_data, nlb_ips):
+    """
+    Append the NLB IP addresses to the data
+    structure.
+    
+    :param nlb_data:
+    :param nlb_ips:
+    :return: 
+    """
+
+    ip_list = nlb_ips.split('/n')
+    print("[append_nlb_ip_data] NLB IP List: {}".format("ip_list"))
+
+    az_data = nlb_data.get('AVAIL-ZONES')
+    nlb_data['AVAIL-ZONES'] = []
+    az_0 = az_data[0]
+    az_1 = az_data[1]
+
+    az_0['NLB-IP'] = ip_list[0]
+    az_1['NLB-IP'] = ip_list[1]
+
+    nlb_data['AVAIL-ZONES'].append(az_0)
+    nlb_data['AVAIL-ZONES'].append(az_1)
+
+    return nlb_data
+
+
+def resolve_nlb_ip(nlb_dns):
+    """
+    Resolve the NLB IP address
+    :param nlb_dns: 
+    :return: 
+    """
+
+    ips = dns.pan_dig(nlb_dns)
+    print("[resolve_nlb_ip] IP Addresses of the NLB are: {}".format(ips))
+    return ips
 
 def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name):
     """
@@ -308,7 +320,7 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name):
         )
     except Exception, e:
         print("\n\nNLB: (ARN: {} Name: {}) is not found. Possibly been deleted.\n\n".format(nlb_arn, nlb_name))
-        handle_nlb_delete('arn:aws:elasticloadbalancing:us-west-2:140651570565:loadbalancer/net/prot-nlb/0645436f7bcebcda', nlb_name, table_name)
+        handle_nlb_delete(nlb_arn, nlb_name, table_name)
         return
 
     parsed_response = parse_and_create_nlb_data(None, nlb_response)
@@ -320,24 +332,6 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name):
         print("\n\nNLB (ARN: {} Name: {}) already exists in the DB. No changes to the deployment\n\n".format(nlb_arn, nlb_name))
 
 
-def create_service_deps(table_name):
-    """
-    Create the application artifacts necessary to 
-    achieve the objective of the lambda function 
-    deployment.
-    
-    :param table_name:  
-    :return: 
-    """
-
-    # Create a dynamodb database and
-    # initialize the necessary tables
-    try:
-        create_dynamo_db('nlb_db_table')
-    except Exception, e:
-        print e
-
-
 def nlb_lambda_handler(event, context):
     """
     
@@ -347,7 +341,7 @@ def nlb_lambda_handler(event, context):
     """
     assume_role = False
     print event, context
-    
+
     table_name = event['table_name']
     nlb_arn = event['NLB-ARN']
     nlb_name = event['NLB-NAME']
@@ -357,10 +351,6 @@ def nlb_lambda_handler(event, context):
             assume_role_and_dispatch(event['RoleArn'], data)
             assume_role_and_dispatch('arn:aws:iam::140651570565:role/nlb_sqs_perms', data)
         else:
-            create_service_deps(table_name)
-            #identify_and_handle_nlb_state('arn:aws:elasticloadbalancing:us-west-2:140651570565:loadbalancer/net/prot-nlb/0645436f7bcebcdb',
-            #                              'prot-nlb',
-            #                              'nlb_db_table')
             identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name)
     except Exception, e:
         print e
