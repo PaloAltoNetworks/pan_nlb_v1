@@ -20,7 +20,7 @@
       "Type" : "String",
       "Description": "Enter the name of the External Classic Load Balancer",
       "MinLength" : "3",
-      "MaxLength" : "65"
+      "MaxLength" : "165"
     },
     "TableName": {
       "Type" : "String",
