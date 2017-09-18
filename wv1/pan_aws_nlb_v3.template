@@ -56,18 +56,20 @@
       "MinLength" : "3",
       "MaxLength" : "120"
     },
-    "NLBType": {
-      "Type" : "String",
-      "Description": "Input the type of Network Load Balancer",
-      "Default": "internal",
-      "MinLength" : "3",
-      "MaxLength" : "20"
-    },
     "QueueURL": {
       "Type" : "String",
       "Description": "Enter the name of the External Classic Load Balancer",
       "MinLength" : "3",
-      "MaxLength" : "165"
+      "MaxLength" : "120"
+    },
+    "SSHLocation" : {
+      "Description" : "Restrict SSH access to the VM-Series firewall (by default can be accessed from anywhere)",
+      "Type" : "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default" : "0.0.0.0/0",
+      "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x."
     },
     "S3BucketName": {
       "Type" : "String",
@@ -86,7 +88,7 @@
       "Description": "Enter the name of the External Classic Load Balancer",
       "MinLength" : "3",
       "MaxLength" : "120"
-    }
+    },
   },
   "Mappings" : {
     "Constants": {
@@ -94,7 +96,7 @@
          "URL1": "https://s3.amazonaws.com"
       },
       "S3MainTpl": {
-         "TPL1": "nlb-template/pan_nlb_lambda.template"
+         "TPL1": "nlb1-template/pan_nlb_lambda.template"
       }
     },
     "AWSInstanceType2Arch" : {
@@ -207,7 +209,7 @@
       "Properties" : {
         "Name" : { "Ref" : "NLBName" },
         "Subnets" : [ { "Fn::Select" : [ "0", {"Ref" : "SubnetIDs"} ] }, { "Fn::Select" : [ "1", {"Ref" : "SubnetIDs"} ] } ],
-        "Scheme" : {"Ref": "NLBType"},
+        "Scheme" : "internet-facing",
         "Type": "network"
       },
       "DependsOn": [ "NetworkLoadBalancerSecurityGroup" ]
@@ -345,7 +347,7 @@
     "WebServerTargetGroup": {
        "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
        "Properties" : {
-             "Name" :{ "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" },  "AppTgtGrp" ] ] },
+             "Name" :{ "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" },  "WebServerTargetGroup" ] ] },
              "Port" : "80",
              "Protocol" : "TCP",
              "UnhealthyThresholdCount" : "3",
@@ -369,7 +371,7 @@
       "Type" : "AWS::CloudFormation::Stack",
       "Properties" : {
             "TemplateURL" : { "Fn::Join": [ "/", [ { "Fn::FindInMap" : [ "Constants", "S3URL", "URL1" ]},
-                                { "Ref": "S3BucketName"}, { "Ref": "S3ObjectName"} ] ] },
+                                { "Fn::FindInMap" : [ "Constants", "S3MainTpl", "TPL1" ]} ] ] },
             "Parameters" : {
                "TableName": {"Ref": "TableName"},
                "NLBARN": {"Ref": "NetworkLoadBalancer"},

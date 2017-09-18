@@ -20,7 +20,7 @@
       "Type" : "String",
       "Description": "Enter the name of the External Classic Load Balancer",
       "MinLength" : "3",
-      "MaxLength" : "165"
+      "MaxLength" : "120"
     },
     "TableName": {
       "Type" : "String",
@@ -223,7 +223,7 @@
             "Handler": "nlb_deployer.nlb_deploy_handler",
             "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },
             "Code": {
-                "S3Bucket": "nlb-template",
+                "S3Bucket": "nlb1-template",
                 "S3Key": "nlb.zip"
             },
         "Runtime": "python2.7",
