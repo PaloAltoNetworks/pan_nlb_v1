@@ -27,7 +27,7 @@
       "Default": "nlb_db_tbl",
       "Description": "Enter the name of the database table",
       "MinLength" : "3",
-      "MaxLength" : "15"
+      "MaxLength" : "65"
     },
     "S3BucketName": {
       "Type" : "String",
