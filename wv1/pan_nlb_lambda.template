@@ -89,12 +89,12 @@
                 {
                     "Effect": "Allow",
                     "Action": "s3:ListBucket",
-                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", "nlb-template", "/*" ] ] }
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", "nlb1-template", "/*" ] ] }
                 },
                 {
                     "Effect": "Allow",
                     "Action": "s3:GetObject",
-                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", "nlb-template", "/*" ] ] }
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", "nlb1-template", "/*" ] ] }
                 },
             {
                 "Effect": "Allow",
