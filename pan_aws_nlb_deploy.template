@@ -216,7 +216,7 @@
       "Properties" : {
         "Name" : { "Ref" : "NLBName" },
         "Subnets" : [ { "Fn::Select" : [ "0", {"Ref" : "SubnetIDs"} ] }, { "Fn::Select" : [ "1", {"Ref" : "SubnetIDs"} ] } ],
-        "Scheme" : "internet-facing",
+        "Scheme" : {"Ref": "NLBType"},
         "Type": "network"
       },
       "DependsOn": [ "NetworkLoadBalancerSecurityGroup" ]
