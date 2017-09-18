@@ -73,7 +73,7 @@ def parse_and_create_nlb_data(msg_operation, nlb_response):
         return msg_data
 
 
-def send_to_queue(data):
+def send_to_queue(data, queue_url):
     """
     Method to push the DNS Names of the NLB into a SQS Queue
     :param dns_name: 
@@ -81,7 +81,7 @@ def send_to_queue(data):
     """
 
     sqs_client.send_message(
-        QueueUrl='https://sqs.us-west-2.amazonaws.com/140651570565/tfv2',
+        QueueUrl=queue_url,
         MessageBody=json.dumps(data),
         MessageAttributes={
             'panw-fw-nlb-msg': {
@@ -208,7 +208,7 @@ def delete_db_entry(key_hash, key_range, table_name):
         print e
 
 
-def handle_nlb_delete(nlb_arn, nlb_name, table_name):
+def handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url):
     """
     This method handles the delete workflow 
     associated with the case when an NLB has 
@@ -229,14 +229,14 @@ def handle_nlb_delete(nlb_arn, nlb_name, table_name):
     elif err_code == 0:
         db_item = parse_and_create_nlb_data('DEL-NLB', response.get('DNS-NAME'))
         # send delete message
-        send_to_queue(db_item)
+        send_to_queue(db_item, queue_url)
         # delete it from the database
         delete_db_entry(nlb_arn, nlb_name, table_name)
     else:
         print "Catch all case."
 
 
-def handle_nlb_add(nlb_response, table_name):
+def handle_nlb_add(nlb_response, table_name, queue_url):
     """
     This method handles the add nlb workflow 
     to identify a new NLB and publish the information 
@@ -262,7 +262,7 @@ def handle_nlb_add(nlb_response, table_name):
     db_add_nlb_record(final_nlb_data, table_name)
 
     # Secondly, send a message out on the queue
-    send_to_queue(final_nlb_data)
+    send_to_queue(final_nlb_data, queue_url)
 
 
 def append_nlb_ip_data(nlb_data, nlb_ips):
@@ -303,7 +303,7 @@ def resolve_nlb_ip(nlb_dns):
     print("[resolve_nlb_ip] IP Addresses of the NLB are: {}".format(ips))
     return ips
 
-def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name):
+def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url):
     """
     Identify the various states of interest with regards
     to the NLB deployment. 
@@ -320,13 +320,13 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name):
         )
     except Exception, e:
         print("\n\nNLB: (ARN: {} Name: {}) is not found. Possibly been deleted.\n\n".format(nlb_arn, nlb_name))
-        handle_nlb_delete(nlb_arn, nlb_name, table_name)
+        handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url)
         return
 
     parsed_response = parse_and_create_nlb_data(None, nlb_response)
     ret_code, err_code, response = check_db_entry(parsed_response.get('NLB-ARN'), parsed_response.get('NLB-NAME'), table_name)
     if err_code == 1:
-        handle_nlb_add(nlb_response, table_name)
+        handle_nlb_add(nlb_response, table_name, queue_url)
     else:
         # This is essentially the NOOP case. i.e no changes to the NLB's
         print("\n\nNLB (ARN: {} Name: {}) already exists in the DB. No changes to the deployment\n\n".format(nlb_arn, nlb_name))
@@ -345,13 +345,14 @@ def nlb_lambda_handler(event, context):
     table_name = event['table_name']
     nlb_arn = event['NLB-ARN']
     nlb_name = event['NLB-NAME']
+    queue_url = event['QueueURL']
 
     try:
         if assume_role:
             assume_role_and_dispatch(event['RoleArn'], data)
             assume_role_and_dispatch('arn:aws:iam::140651570565:role/nlb_sqs_perms', data)
         else:
-            identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name)
+            identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url)
     except Exception, e:
         print e
     finally:
