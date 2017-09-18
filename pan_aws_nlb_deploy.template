@@ -354,7 +354,7 @@
     "WebServerTargetGroup": {
        "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
        "Properties" : {
-             "Name" :{ "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" },  "WebServerTargetGroup" ] ] },
+             "Name" :{ "Fn::Join": [ "-", [ { "Ref": "AWS::StackName" },  "AppTgtGrp" ] ] },
              "Port" : "80",
              "Protocol" : "TCP",
              "UnhealthyThresholdCount" : "3",
