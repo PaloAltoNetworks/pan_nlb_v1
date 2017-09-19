@@ -38,7 +38,33 @@ def retry(delays=(0, 1, 5, 30),
     return wrapper
 
 
-def parse_and_create_nlb_data(msg_operation, nlb_response):
+def modify_message_data(az_info):
+    """
+    
+    :param az_info: 
+    :return: 
+    """
+
+    print("[modify_message_data]: Input az_info: {}".format(az_info))
+    try:
+        az_data = []
+        for _az in az_info:
+            subnet_id = _az.pop('SubnetId')
+            zone_name = _az.pop('ZoneName')
+
+            _az['SUBNET-ID'] = subnet_id
+            _az['ZONE-NAME'] = zone_name
+            az_data.append(_az)
+
+        print("[modify_message_data] Modified message data: {}".format(az_data))
+        return az_data
+    except Exception, e:
+        print e
+    print("Returning from modify_message_data")
+    return None
+
+
+def parse_and_create_nlb_data(msg_operation, nlb_response, initial):
     """
     
     :param nlb_response: 
@@ -59,11 +85,17 @@ def parse_and_create_nlb_data(msg_operation, nlb_response):
         dns_name = nlb.get('DNSName', None)
         nlb_name = nlb.get('LoadBalancerName')
         az_info = nlb.get('AvailabilityZones')
+
+        if not initial:
+            print("[parse_and_create_nlb_data]: Original AZ data: {}".format(az_info))
+            updated_az_data = modify_message_data(az_info)
+            print("[parse_and_create_nlb_data]: Updated AZ data: {}".format(updated_az_data))
+
         vpc_id = nlb.get('VpcId', None)
         nlb_arn = nlb.get('LoadBalancerArn', None)
         msg_data = {
             'MSG-TYPE': msg_operation,
-            'AVAIL-ZONES': az_info,
+            'AVAIL-ZONES': az_info if initial else updated_az_data,
             'DNS-NAME': dns_name,
             'VPC-ID': vpc_id,
             'NLB-NAME': nlb_name,
@@ -80,6 +112,7 @@ def send_to_queue(data, queue_url):
     :return: 
     """
 
+    print("[send_to_queue]: Final data being sent to queue: {}".format(data))
     sqs_client.send_message(
         QueueUrl=queue_url,
         MessageBody=json.dumps(data),
@@ -247,8 +280,9 @@ def handle_nlb_add(nlb_response, table_name, queue_url):
     :param table_name: 
     :return: 
     """
+    print("****************** handle nlb add  START **************")
     print("[handle_nlb_add] NLB details: {}".format(nlb_response))
-    db_item = parse_and_create_nlb_data('ADD-NLB', nlb_response)
+    db_item = parse_and_create_nlb_data('ADD-NLB', nlb_response, False)
 
     nlb_dns = db_item.get('DNS-NAME', None)
     print("nlb dns name: {}".format(nlb_dns))
@@ -263,7 +297,7 @@ def handle_nlb_add(nlb_response, table_name, queue_url):
 
     # Secondly, send a message out on the queue
     send_to_queue(final_nlb_data, queue_url)
-
+    print("****************** handle nlb add  END **************")
 
 def append_nlb_ip_data(nlb_data, nlb_ips):
     """
@@ -323,7 +357,8 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url):
         handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url)
         return
 
-    parsed_response = parse_and_create_nlb_data(None, nlb_response)
+    print("Identify the scenario....")
+    parsed_response = parse_and_create_nlb_data(None, nlb_response, True)
     ret_code, err_code, response = check_db_entry(parsed_response.get('NLB-ARN'), parsed_response.get('NLB-NAME'), table_name)
     if err_code == 1:
         handle_nlb_add(nlb_response, table_name, queue_url)

@@ -89,12 +89,12 @@
                 {
                     "Effect": "Allow",
                     "Action": "s3:ListBucket",
-                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", "nlb1-template", "/*" ] ] }
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", {"Ref": "S3BucketName" }, "/*" ] ] }
                 },
                 {
                     "Effect": "Allow",
                     "Action": "s3:GetObject",
-                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", "nlb1-template", "/*" ] ] }
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
                 },
             {
                 "Effect": "Allow",
@@ -223,8 +223,8 @@
             "Handler": "nlb_deployer.nlb_deploy_handler",
             "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },
             "Code": {
-                "S3Bucket": "nlb1-template",
-                "S3Key": "nlb.zip"
+                "S3Bucket": { "Ref": "S3BucketName"},
+                "S3Key": { "Ref": "S3ObjectName"}
             },
         "Runtime": "python2.7",
         "Timeout": "300"
