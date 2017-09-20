@@ -5,6 +5,8 @@ import time
 import logging
 import sys
 
+from botocore.exceptions import ClientError
+
 sys.path.append('dnslib/')
 import pan_client as dns
 
@@ -203,11 +205,18 @@ def get_db_entry(key_hash, key_range, table_name):
                 'NLB-NAME': key_range
             }
         )
-    except Exception, e:
-        print e
-        print("\n\n The NLB of interest is not found")
-        return (False, 2, None)
+    except ClientError as e:
+        print("[get_db_entry]: Exception handler. Response: {}".format(response))
+        print("[get_db_entry]: Exception occurred: {}".format(e))
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            print('[get_db_entry]: ResourceNotFoundException occurred')
+            print("returning false 1 None")
+            return (False, 1, None)
+        else:
+            print("[get_db_entry] Unexpected exception occurred: {}".format(e))
+            return (False, 2, None)
 
+    print("No exceptions occurred while retrieving items from the database.")
     print("[get_db_entry] Response from db: {}".format(response))
     if not response.get('Item', None):
         # The case when there are no items in the database
@@ -362,6 +371,8 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url):
     ret_code, err_code, response = check_db_entry(parsed_response.get('NLB-ARN'), parsed_response.get('NLB-NAME'), table_name)
     if err_code == 1:
         handle_nlb_add(nlb_response, table_name, queue_url)
+    elif err_code == 2:
+        print("This is the exception case. Error occurred while retrieving data from the database.")
     else:
         # This is essentially the NOOP case. i.e no changes to the NLB's
         print("\n\nNLB (ARN: {} Name: {}) already exists in the DB. No changes to the deployment\n\n".format(nlb_arn, nlb_name))

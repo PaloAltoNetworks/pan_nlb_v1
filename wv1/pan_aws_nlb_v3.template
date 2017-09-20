@@ -21,6 +21,13 @@
        "Description" : "Amazon EC2 Key Pair",
        "Type" : "AWS::EC2::KeyPair::KeyName"
     },
+    "NLBType": {
+      "Type" : "String",
+      "Description": "Input the type of Network Load Balancer",
+      "Default": "internal",
+      "MinLength" : "3",
+      "MaxLength" : "30"
+    },
     "SSHLocation" : {
       "Description" : "Restrict SSH access to the VM-Series firewall (by default can be accessed from anywhere)",
       "Type" : "String",
@@ -209,7 +216,7 @@
       "Properties" : {
         "Name" : { "Ref" : "NLBName" },
         "Subnets" : [ { "Fn::Select" : [ "0", {"Ref" : "SubnetIDs"} ] }, { "Fn::Select" : [ "1", {"Ref" : "SubnetIDs"} ] } ],
-        "Scheme" : "internet-facing",
+        "Scheme" : { "Ref": "NLBType" },
         "Type": "network"
       },
       "DependsOn": [ "NetworkLoadBalancerSecurityGroup" ]
