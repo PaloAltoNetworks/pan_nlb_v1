@@ -268,7 +268,7 @@ def handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url):
     if err_code == 1:
         print("Nothing to be done.")
     elif err_code == 0:
-        db_item = parse_and_create_nlb_data('DEL-NLB', response.get('DNS-NAME'))
+        db_item = parse_and_create_nlb_data('DEL-NLB', response.get('DNS-NAME'), False)
         # send delete message
         send_to_queue(db_item, queue_url)
         # delete it from the database
