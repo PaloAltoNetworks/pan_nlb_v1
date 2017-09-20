@@ -162,7 +162,7 @@ def db_add_nlb_record(db_item, table_name):
     """
 
     print("[db_add_nlb_record] Adding item: {}".format(db_item))
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(table_name)
     table.put_item(
         Item=db_item
@@ -195,7 +195,7 @@ def get_db_entry(key_hash, key_range, table_name):
     """
 
     print("[get_db_entry] Retrieve items from the db: key_hash: {} key_range: {}".format(key_hash, key_range))
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(table_name)
 
     try:
@@ -206,7 +206,6 @@ def get_db_entry(key_hash, key_range, table_name):
             }
         )
     except ClientError as e:
-        print("[get_db_entry]: Exception handler. Response: {}".format(response))
         print("[get_db_entry]: Exception occurred: {}".format(e))
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             print('[get_db_entry]: ResourceNotFoundException occurred')
@@ -236,7 +235,7 @@ def delete_db_entry(key_hash, key_range, table_name):
     :param table_name: 
     :return: 
     """
-    dynamodb = boto3.resource('dynamodb', region_name='us-west-2')
+    dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(table_name)
     print "Calling delete... {} {} ".format(key_hash, key_range)
     try:
