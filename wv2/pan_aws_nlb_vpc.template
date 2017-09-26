@@ -41,7 +41,7 @@
       "Description" : "Name of the newly created VPC",
       "Type" : "String",
       "MinLength": "6",
-      "MaxLength": "24",
+      "MaxLength": "75",
       "Default" : "panwVPC"
     },
     "VPCCIDR": {
