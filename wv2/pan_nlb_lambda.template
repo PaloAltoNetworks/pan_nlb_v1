@@ -4,21 +4,21 @@
   "Parameters": {
     "NLBName": {
       "Type" : "String",
-      "Description": "Enter the name of the External Classic Load Balancer",
+      "Description": "Enter the name of the NLB",
       "Default": "prot-nlb",
       "MinLength" : "3",
       "MaxLength" : "120"
     },
     "NLBARN": {
       "Type" : "String",
-      "Description": "Enter the name of the External Classic Load Balancer",
+      "Description": "Enter the ARN of the NLB",
       "Default": "prot-nlb",
       "MinLength" : "3",
       "MaxLength" : "150"
     },
     "QueueURL": {
       "Type" : "String",
-      "Description": "Enter the name of the External Classic Load Balancer",
+      "Description": "Enter the URL of the Queue to send messages to",
       "MinLength" : "3",
       "MaxLength" : "120"
     },
@@ -31,27 +31,16 @@
     },
     "S3BucketName": {
       "Type" : "String",
-      "Default": "nlb-template",
-      "Description": "Enter the ARN of the role to be used for the deployment",
+      "Description": "Enter the name of the S3 Bucket which contains the lambda code",
       "MinLength" : "3",
       "MaxLength" : "120"
     },
     "S3ObjectName": {
       "Type" : "String",
       "Default": "nlb.zip",
-      "Description": "Enter the ARN of the role to be used for the deployment",
+      "Description": "Enter the name of the S3 object which contains the lambda code",
       "MinLength" : "3",
       "MaxLength" : "120"
-    }
-  },
-  "Mappings" : {
-    "Constants": {
-      "S3URL": {
-         "URL1": "https://s3.amazonaws.com"
-      },
-      "S3MainTpl": {
-         "TPL1": "firewall.template"
-      }
     }
   },
   "Metadata" : {
