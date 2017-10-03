@@ -1,8 +1,7 @@
 import boto3
 import httplib
 import json
-import itertools
-import time
+import describe_nlb_dns as pan_dnd
 import logging
 from urlparse import urlparse
 from contextlib import closing
@@ -126,7 +125,8 @@ def delete_dynamo_db_table(table_name):
     logger.info('[delete_dynamo_db_table]: Response: {}'.format(response))
 
 
-def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3BucketName, S3Object, table_name, NLB_ARN, NLB_NAME, QueueURL):
+def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3BucketName, S3Object, table_name,
+                                    NLB_ARN, NLB_NAME, QueueURL):
     """
     
     :param event: 
@@ -293,9 +293,12 @@ def handle_stack_delete(event, context):
     stackname = event['ResourceProperties']['StackName']
     table_name = event['ResourceProperties']['table_name']
     NLB_ARN = event['ResourceProperties']['NLB-ARN']
+    NLB_NAME = event['ResourceProperties']['NLB-NAME']
+    QueueURL = event['ResourceProperties']['QueueURL']
 
     try:
         delete_lambda_function_artifacts(stackname, NLB_ARN)
+        pan_dnd.handle_nlb_delete(NLB_ARN, NLB_NAME, table_name, QueueURL)
         delete_dynamo_db_table(table_name)
     except Exception, e:
         print("[handle_stack_delete] Exception occurred: {}".format(e))
