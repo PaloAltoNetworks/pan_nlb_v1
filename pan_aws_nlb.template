@@ -21,13 +21,6 @@
        "Description" : "Amazon EC2 Key Pair",
        "Type" : "AWS::EC2::KeyPair::KeyName"
     },
-    "NLBType": {
-      "Type" : "String",
-      "Description": "Input the type of Network Load Balancer",
-      "Default": "internal",
-      "MinLength" : "3",
-      "MaxLength" : "30"
-    },
     "SSHLocation" : {
       "Description" : "Restrict SSH access to the VM-Series firewall (by default can be accessed from anywhere)",
       "Type" : "String",
@@ -39,7 +32,8 @@
     },
     "VpcAzs": {
       "Type": "List<AWS::EC2::AvailabilityZone::Name>",
-      "Description": "Enter the list of Availability Zones (Based on Number of AZs above)"
+      "Description": "Enter the list of Availability Zones (Based on Number of AZs above). \n
+                      Required for the deployment of the backend application"
     },
     "VPCCIDR": {
       "Type": "String",
@@ -75,13 +69,13 @@
       "MinLength" : "3",
       "MaxLength" : "120"
     },
-    "LambdaTemplateName": {
+    "NestedLambdaTemplateName": {
       "Type" : "String",
       "Description": "Enter the name of the S3 object which contains the lambda template",
       "MinLength" : "3",
       "MaxLength" : "120"
     },
-    "S3ObjectName": {
+    "LambdaZipFileName": {
       "Type" : "String",
       "Description": "Enter the name of the S3 object which contains the lambda function code",
       "MinLength" : "3",
@@ -167,6 +161,30 @@
   },
   "Metadata" : {
     "AWS::CloudFormation::Interface" : {
+        "ParameterGroups" : [
+            {
+                "Label": {"default": "VPC Section"},
+                "Parameters": ["VpcAzs", "VPCCIDR", "VPCID", "SubnetIDs"]
+            },
+            {
+                "Label": {"default": "NLB Section"},
+                "Parameters": ["NLBName"]
+            },
+            {
+                "Label": {"default": "Lambda Section"},
+                "Parameters": [ "S3BucketName", "NestedLambdaTemplateName", "LambdaZipFileName",
+                                "QueueURL", "TableName"
+                              ]
+            },
+            {
+                "Label": {"default": "Application Section"},
+                "Parameters": ["InstanceType"]
+            },
+            {
+                "Label": {"default": "Access Section"},
+                "Parameters": ["KeyName", "SSHLocation"]
+            }
+        ],
         "ParameterLabels" : {
             "VPCName": {"default": "VPC Name:"},
             "VPCCIDR": {"default": "CIDR Block for the VPC:"},
@@ -214,7 +232,7 @@
       "Properties" : {
         "Name" : { "Ref" : "NLBName" },
         "Subnets" : [ { "Fn::Select" : [ "0", {"Ref" : "SubnetIDs"} ] }, { "Fn::Select" : [ "1", {"Ref" : "SubnetIDs"} ] } ],
-        "Scheme" : { "Ref": "NLBType" },
+        "Scheme" : "internal",
         "Type": "network"
       },
       "DependsOn": [ "NetworkLoadBalancerSecurityGroup" ]
@@ -376,13 +394,13 @@
       "Type" : "AWS::CloudFormation::Stack",
       "Properties" : {
             "TemplateURL" : { "Fn::Join": [ "/", [ { "Fn::FindInMap" : [ "Constants", "S3URL", "URL1" ]},
-                                { "Ref": "S3BucketName" }, { "Ref": "LambdaTemplateName" } ] ] },
+                                { "Ref": "S3BucketName" }, { "Ref": "NestedLambdaTemplateName" } ] ] },
             "Parameters" : {
                "TableName": {"Ref": "TableName"},
                "NLBARN": {"Ref": "NetworkLoadBalancer"},
                "NLBName": {"Ref": "NLBName"},
                "S3BucketName": {"Ref": "S3BucketName"},
-               "S3ObjectName": {"Ref": "S3ObjectName"},
+               "S3ObjectName": {"Ref": "LambdaZipFileName"},
                "QueueURL": {"Ref": "QueueURL"}
             }
       },
