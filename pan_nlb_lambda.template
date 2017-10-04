@@ -85,126 +85,135 @@
                     "Action": "s3:GetObject",
                     "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
                 },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "events:*"
-                ],
-                "Resource": [
-                    "*"
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "ec2:DescribeSubnets"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "events:*"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "cloudwatch:*"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "lambda:AddPermission",
+                        "lambda:CreateEventSourceMapping",
+                        "lambda:CreateFunction",
+                        "lambda:DeleteEventSourceMapping",
+                        "lambda:DeleteFunction",
+                        "lambda:GetEventSourceMapping",
+                        "lambda:ListEventSourceMappings",
+                        "lambda:RemovePermission",
+                        "lambda:UpdateEventSourceMapping",
+                        "lambda:UpdateFunctionCode",
+                        "lambda:UpdateFunctionConfiguration",
+                        "lambda:GetFunction",
+                        "lambda:ListFunctions"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:ReceiveMessage",
+                        "sqs:SendMessage",
+                        "sqs:SetQueueAttributes",
+                        "sqs:PurgeQueue"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "elasticloadbalancing:AddTags",
+                        "elasticloadbalancing:AttachLoadBalancerToSubnets",
+                        "elasticloadbalancing:ConfigureHealthCheck",
+                        "elasticloadbalancing:DescribeInstanceHealth",
+                        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+                        "elasticloadbalancing:DescribeLoadBalancerPolicyTypes",
+                        "elasticloadbalancing:DescribeLoadBalancerPolicies",
+                        "elasticloadbalancing:DescribeLoadBalancers",
+                        "elasticloadbalancing:DescribeTags",
+                        "elasticloadbalancing:DetachLoadBalancerFromSubnets",
+                        "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                        "elasticloadbalancing:RemoveTags"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:PassRole",
+                        "iam:GetRole"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["cloudformation:DescribeStacks"],
+                  "Resource": "*"
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutDestination",
+                        "logs:PutDestinationPolicy",
+                        "logs:PutLogEvents",
+                        "logs:PutMetricFilter"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "dynamodb:CreateTable",
+                        "dynamodb:DeleteItem",
+                        "dynamodb:DeleteTable",
+                        "dynamodb:GetItem",
+                        "dynamodb:PutItem"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                }
                 ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "cloudwatch:*"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "lambda:AddPermission",
-                    "lambda:CreateEventSourceMapping",
-                    "lambda:CreateFunction",
-                    "lambda:DeleteEventSourceMapping",
-                    "lambda:DeleteFunction",
-                    "lambda:GetEventSourceMapping",
-                    "lambda:ListEventSourceMappings",
-                    "lambda:RemovePermission",
-                    "lambda:UpdateEventSourceMapping",
-                    "lambda:UpdateFunctionCode",
-                    "lambda:UpdateFunctionConfiguration",
-                    "lambda:GetFunction",
-                    "lambda:ListFunctions"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "sqs:ReceiveMessage",
-                    "sqs:SendMessage",
-                    "sqs:SetQueueAttributes",
-                    "sqs:PurgeQueue"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "elasticloadbalancing:AddTags",
-                    "elasticloadbalancing:AttachLoadBalancerToSubnets",
-                    "elasticloadbalancing:ConfigureHealthCheck",
-                    "elasticloadbalancing:DescribeInstanceHealth",
-                    "elasticloadbalancing:DescribeLoadBalancerAttributes",
-                    "elasticloadbalancing:DescribeLoadBalancerPolicyTypes",
-                    "elasticloadbalancing:DescribeLoadBalancerPolicies",
-                    "elasticloadbalancing:DescribeLoadBalancers",
-                    "elasticloadbalancing:DescribeTags",
-                    "elasticloadbalancing:DetachLoadBalancerFromSubnets",
-                    "elasticloadbalancing:ModifyLoadBalancerAttributes",
-                    "elasticloadbalancing:RemoveTags"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "iam:PassRole",
-                    "iam:GetRole"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-              "Effect": "Allow",
-              "Action": ["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
-              "Resource": "arn:aws:logs:*:*:*"
-            },
-            {
-              "Effect": "Allow",
-              "Action": ["cloudformation:DescribeStacks"],
-              "Resource": "*"
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutDestination",
-                    "logs:PutDestinationPolicy",
-                    "logs:PutLogEvents",
-                    "logs:PutMetricFilter"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "dynamodb:CreateTable",
-                    "dynamodb:DeleteItem",
-                    "dynamodb:DeleteTable",
-                    "dynamodb:GetItem",
-                    "dynamodb:PutItem"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            }
-            ]
-          }}]}
+              }}]}
     },
     "NLBDeployerLambda" : {
         "Type": "AWS::Lambda::Function",

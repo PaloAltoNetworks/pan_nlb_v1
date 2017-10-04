@@ -16,6 +16,7 @@ logger.setLevel(logging.INFO)
 lb_client = boto3.client('elbv2')
 sqs_client = boto3.client('sqs')
 sts_client = boto3.client('sts')
+ec2_client = boto3.client('ec2')
 
 
 def retry(delays=(0, 1, 5, 30),
@@ -277,6 +278,21 @@ def handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url):
         print "Catch all case."
 
 
+def get_subnet_info(nlb_response):
+
+    subnet_ip_mapping = []
+    print("get_subnet_info: {}".format(nlb_response))
+    lb = nlb_response['LoadBalancers'][0]
+    az_info = lb.get('AvailabilityZones', None)
+    print("Az info: {}".format(az_info))
+    subnet_data = ec2_client.describe_subnets(
+            SubnetIds=[az_info[0]['SubnetId'], az_info[1]['SubnetId']]
+    )
+    print("Subnet data: {}".format(subnet_data))
+    return subnet_data
+
+
+
 def handle_nlb_add(nlb_response, table_name, queue_url):
     """
     This method handles the add nlb workflow 
@@ -290,6 +306,9 @@ def handle_nlb_add(nlb_response, table_name, queue_url):
     """
     print("****************** handle nlb add  START **************")
     print("[handle_nlb_add] NLB details: {}".format(nlb_response))
+
+    print("Retrieve subnet details")
+    subnet_data = get_subnet_info(nlb_response)
     db_item = parse_and_create_nlb_data('ADD-NLB', nlb_response, False)
 
     nlb_dns = db_item.get('DNS-NAME', None)
@@ -298,7 +317,7 @@ def handle_nlb_add(nlb_response, table_name, queue_url):
     ips = resolve_nlb_ip(nlb_dns)
     print("[handle_nlb_add] nlb ips: {} type: {}".format(ips, type(ips)))
 
-    final_nlb_data = append_nlb_ip_data(db_item, ips)
+    final_nlb_data = append_nlb_ip_data(db_item, ips, subnet_data)
 
     # First add it to the database
     db_add_nlb_record(final_nlb_data, table_name)
@@ -307,7 +326,44 @@ def handle_nlb_add(nlb_response, table_name, queue_url):
     send_to_queue(final_nlb_data, queue_url)
     print("****************** handle nlb add  END **************")
 
-def append_nlb_ip_data(nlb_data, nlb_ips):
+
+def get_ip_to_az_mapping(subnet_data, ip):
+
+    print("[get_ip_to_az_mapping] Subnet_data: {}\n IP: {}".format(subnet_data, ip))
+    ips = ip.split('.')
+    subnets = subnet_data['Subnets']
+
+    # Construct a map containing the
+    # the availability zone to cidr mapping.
+
+    az_cidr_map = {}
+    for subnet in subnets:
+        cidr_block = subnet['CidrBlock']
+        subnet_id = subnet['SubnetId']
+        az = subnet['AvailabilityZone']
+        subnet_az = az.split('-')[2]
+
+
+        cidr_s = cidr_block.split('/')
+        if cidr_s[1] == '24':
+            cidr_sub_s = cidr_s[0].split('.')
+            print("cidr_sub_s: {}".format(cidr_sub_s))
+            print("Comparing IP: {} with CIDR: {}".format(ips, cidr_sub_s))
+            print("ip0: {} ip1: {} ip2: {} cidr0: {} cidr1: {} cidr2: {}".format(
+                    ips[0], ips[1], ips[2], cidr_sub_s[0], cidr_sub_s[1], cidr_sub_s[2]
+            ))
+            if ips[0] == cidr_sub_s[0] and ips[1] == cidr_sub_s[1] and ips[2] == cidr_sub_s[2]:
+                print("Subnet id = {} Az = {}".format(subnet_id, az))
+                ip_az_map = {'SUBNET-ID': subnet_id, 'AVAILABILITY-ZONE': az, 'IP': ip, 'CIDR-BLOCK': cidr_block}
+                print("IP to Az mapping: {}".format(ip_az_map))
+                return ip_az_map
+            else:
+                print("Did not match the subnet cidr for the first element.")
+                print("Continue")
+    print("If it hit here then something is wrong....")
+    return None
+
+def append_nlb_ip_data(nlb_data, nlb_ips, subnet_data):
     """
     Append the NLB IP addresses to the data
     structure.
@@ -325,9 +381,23 @@ def append_nlb_ip_data(nlb_data, nlb_ips):
     az_0 = az_data[0]
     az_1 = az_data[1]
 
-    az_0['NLB-IP'] = ip_list[0]
-    az_1['NLB-IP'] = ip_list[1]
+    for ip in ip_list:
+        print("********* Processing IP: {} ************".format(ip))
+        az_map = get_ip_to_az_mapping(subnet_data, ip)
+        if az_0['SUBNET-ID'] == az_map['SUBNET-ID']:
+            print("Appending IP: {} to AZ: {} with subnet ID: {} with CIDR BLOCK: {}".format(
+                        az_map['IP'], az_map['AVAILABILITY-ZONE'], az_map['SUBNET-ID'],
+                        az_map['CIDR-BLOCK'])
+            )
+            az_0['NLB-IP'] = az_map['IP']
+        else:
+            print("Appending IP: {} to AZ: {} with subnet ID: {} with CIDR BLOCK: {}".format(
+                az_map['IP'], az_map['AVAILABILITY-ZONE'], az_map['SUBNET-ID'],
+                az_map['CIDR-BLOCK'])
+            )
+            az_1['NLB-IP'] = az_map['IP']
 
+    print("[append_nlb_ip_data] AZ data structure: {}\n{}".format(az_0, az_1))
     nlb_data['AVAIL-ZONES'].append(az_0)
     nlb_data['AVAIL-ZONES'].append(az_1)
 
