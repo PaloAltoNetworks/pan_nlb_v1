@@ -360,7 +360,7 @@ def get_ip_to_az_mapping(subnet_data, ip):
             else:
                 print("Did not match the subnet cidr for the first element.")
                 print("Continue")
-    print("If it hit here then something is wrong....")
+    print("Did not match subnet CIDR. Likely the case that we are dealing with public IP's on the NLB....")
     return None
 
 def append_nlb_ip_data(nlb_data, nlb_ips, subnet_data):
@@ -381,9 +381,14 @@ def append_nlb_ip_data(nlb_data, nlb_ips, subnet_data):
     az_0 = az_data[0]
     az_1 = az_data[1]
 
+    public_nlb_ip = False
+
     for ip in ip_list:
         print("********* Processing IP: {} ************".format(ip))
         az_map = get_ip_to_az_mapping(subnet_data, ip)
+        if not az_map:
+            public_nlb_ip = True
+            break
         if az_0['SUBNET-ID'] == az_map['SUBNET-ID']:
             print("Appending IP: {} to AZ: {} with subnet ID: {} with CIDR BLOCK: {}".format(
                         az_map['IP'], az_map['AVAILABILITY-ZONE'], az_map['SUBNET-ID'],
@@ -396,6 +401,11 @@ def append_nlb_ip_data(nlb_data, nlb_ips, subnet_data):
                 az_map['CIDR-BLOCK'])
             )
             az_1['NLB-IP'] = az_map['IP']
+
+    if public_nlb_ip:
+        print("NLB most likely has public IP's")
+        az_0['NLB-IP'] = ip_list[0]
+        az_1['NLB-IP'] = ip_list[1]
 
     print("[append_nlb_ip_data] AZ data structure: {}\n{}".format(az_0, az_1))
     nlb_data['AVAIL-ZONES'].append(az_0)
