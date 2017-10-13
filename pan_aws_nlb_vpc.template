@@ -256,7 +256,7 @@
         "DestinationCidrBlock" : "0.0.0.0/0",
         "GatewayId" : { "Ref" : "InternetGateway" }
       },
-      "DependsOn": [ "NLBRouteTable", "InternetGateway" ]
+      "DependsOn": [ "NLBRouteTable", "GatewayToInternet" ]
     },
     "NLBRouteTable" : {
       "Type" : "AWS::EC2::RouteTable",
