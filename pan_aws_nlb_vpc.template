@@ -92,6 +92,17 @@
       "MaxLength" : "120",
       "Default": "nlb_db_tbl"
     },
+    "CrossAccountRole": {
+      "Type": "String",
+      "Description": "Enter the ARN of the role to be used.",
+      "Default": ""
+    },
+    "ExternalId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "The external ID associated with the Cross Account Role",
+      "MaxLength" : "120"
+    },
   },
   "Mappings" : {
     "Constants": {
@@ -504,7 +515,9 @@
                "NLBName": {"Ref": "NLBName"},
                "S3BucketName": {"Ref": "S3BucketName"},
                "S3ObjectName": {"Ref": "LambdaZipFileName"},
-               "QueueURL": {"Ref": "QueueURL"}
+               "QueueURL": {"Ref": "QueueURL"},
+               "RoleARN": {"Ref": "CrossAccountRole"},
+               "ExternalId" : {"Ref": "ExternalId"}
             }
       },
       "DependsOn": [ "NetworkLoadBalancer", "WebServerLaunchConfig", "WebServerListener" ]

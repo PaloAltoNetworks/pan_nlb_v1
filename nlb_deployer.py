@@ -126,7 +126,7 @@ def delete_dynamo_db_table(table_name):
 
 
 def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3BucketName, S3Object, table_name,
-                                    NLB_ARN, NLB_NAME, QueueURL):
+                                    NLB_ARN, NLB_NAME, QueueURL, RoleARN, ExternalId):
     """
     
     :param event: 
@@ -177,7 +177,9 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
         'NLB-ARN': NLB_ARN,
         'NLB-NAME': NLB_NAME,
         'table_name': table_name,
-        'QueueURL' : QueueURL
+        'QueueURL' : QueueURL,
+        'RoleARN': RoleARN,
+        'ExternalId': ExternalId
     }
 
     target_id_name = get_target_id_name(stackname)
@@ -269,12 +271,17 @@ def handle_stack_create(event, context):
     NLB_NAME = event['ResourceProperties']['NLB-NAME']
     table_name = event['ResourceProperties']['table_name']
     QueueURL = event['ResourceProperties']['QueueURL']
+    RoleARN = event['ResourceProperties']['RoleARN']
+    ExternalId = event['ResourceProperties']['ExternalId']
 
     try:
         create_service_deps(table_name)
         deploy_and_configure_nlb_lambda(stackname, lambda_execution_role,
                                         S3BucketName, S3Object,
-                                        table_name, NLB_ARN, NLB_NAME, QueueURL)
+                                        table_name, NLB_ARN, NLB_NAME,
+                                        QueueURL,
+                                        RoleARN,
+                                        ExternalId)
     except Exception, e:
         print e
     finally:
@@ -295,10 +302,13 @@ def handle_stack_delete(event, context):
     NLB_ARN = event['ResourceProperties']['NLB-ARN']
     NLB_NAME = event['ResourceProperties']['NLB-NAME']
     QueueURL = event['ResourceProperties']['QueueURL']
+    RoleARN = event['ResourceProperties']['RoleARN']
+    ExternalId = event['ResourceProperties']['ExternalId']
 
     try:
         delete_lambda_function_artifacts(stackname, NLB_ARN)
-        pan_dnd.handle_nlb_delete(NLB_ARN, NLB_NAME, table_name, QueueURL)
+        pan_dnd.handle_nlb_delete(NLB_ARN, NLB_NAME, table_name,
+                                  QueueURL, RoleARN, ExternalId)
         delete_dynamo_db_table(table_name)
     except Exception, e:
         print("[handle_stack_delete] Exception occurred: {}".format(e))

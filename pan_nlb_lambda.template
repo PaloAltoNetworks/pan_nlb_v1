@@ -41,7 +41,19 @@
       "Description": "Enter the name of the S3 object which contains the lambda code",
       "MinLength" : "3",
       "MaxLength" : "120"
-    }
+    },
+    "RoleARN": {
+      "Type": "String",
+      "Default": "",
+      "Description": "The ARN of the role to use for Cross Account Access",
+      "MaxLength" : "120"
+    },
+    "ExternalId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "The external ID associated with the Cross Account Role",
+      "MaxLength" : "120"
+    },
   },
   "Metadata" : {
     "AWS::CloudFormation::Interface" : {
@@ -64,7 +76,7 @@
                "Statement": [ {
                  "Effect": "Allow",
                  "Principal": {
-                 "Service": "lambda.amazonaws.com"
+                    "Service": "lambda.amazonaws.com"
                 },
                 "Action": "sts:AssumeRole"
               } ]
@@ -75,6 +87,11 @@
               "PolicyDocument":{
                 "Version": "2012-10-17",
                 "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "sts:AssumeRole",
+                    "Resource": {"Ref": "RoleARN"}
+                },
                 {
                     "Effect": "Allow",
                     "Action": "s3:ListBucket",
@@ -243,7 +260,9 @@
              "LambdaExecutionRole": {"Ref": "LambdaExecutionRole"},
              "S3BucketName": {"Ref": "S3BucketName"},
              "S3ObjectName": {"Ref": "S3ObjectName"},
-             "QueueURL": {"Ref": "QueueURL"}
+             "QueueURL": {"Ref": "QueueURL"},
+             "RoleARN": {"Ref": "RoleARN"},
+             "ExternalId": {"Ref": "ExternalId"}
          }
     }
   }

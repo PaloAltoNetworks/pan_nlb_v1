@@ -17,7 +17,7 @@ lb_client = boto3.client('elbv2')
 sqs_client = boto3.client('sqs')
 sts_client = boto3.client('sts')
 ec2_client = boto3.client('ec2')
-
+sts_client = boto3.client('sts')
 
 def retry(delays=(0, 1, 5, 30),
           exception=Exception,
@@ -104,55 +104,68 @@ def parse_and_create_nlb_data(msg_operation, nlb_response, initial):
             'NLB-NAME': nlb_name,
             'NLB-ARN': nlb_arn
         }
-        #print msg_data
         return msg_data
 
 
-def send_to_queue(data, queue_url):
+def send_to_queue(data, queue_url, _sts_sqs_client):
     """
     Method to push the DNS Names of the NLB into a SQS Queue
     :param dns_name: 
     :return: 
     """
 
-    print("[send_to_queue]: Final data being sent to queue: {}".format(data))
-    sqs_client.send_message(
-        QueueUrl=queue_url,
-        MessageBody=json.dumps(data),
-        MessageAttributes={
-            'panw-fw-nlb-msg': {
-                'StringValue': '1000',
-                'DataType': 'String'
+    if _sts_sqs_client:
+        print("[assumed role sqs resource]: Sending data to queue")
+
+        _sts_sqs_client.send_message(
+            QueueUrl=queue_url,
+            MessageBody=json.dumps(data),
+            MessageAttributes={
+                'panw-fw-nlb-msg': {
+                    'StringValue': '1000',
+                    'DataType': 'String'
+                }
             }
-        }
-    )
+        )
+    else:
+        print("[send_to_queue]: Final data being sent to queue: {}".format(data))
+        sqs_client.send_message(
+            QueueUrl=queue_url,
+            MessageBody=json.dumps(data),
+            MessageAttributes={
+                'panw-fw-nlb-msg': {
+                    'StringValue': '1000',
+                    'DataType': 'String'
+                }
+            }
+        )
 
 
-def assume_role_and_dispatch(role_arn, data):
+def assume_role_and_send_to_queue(role_arn, data, queue_url, external_id):
     """
-    
-    :param data: 
-    :return: 
+
+    :param data:
+    :return:
     """
 
     assumedRoleObject = sts_client.assume_role(
         RoleArn=role_arn,
-        RoleSessionName="AssumeRoleSession1"
+        RoleSessionName="AssumeRoleSession1",
+        ExternalId=external_id
     )
 
     # From the response that contains the assumed role, get the temporary
     # credentials that can be used to make subsequent API calls
     credentials = assumedRoleObject['Credentials']
 
-    sqs_resource = boto3.resource(
+    sqs_resource = boto3.client(
         'sqs',
         aws_access_key_id = credentials['AccessKeyId'],
         aws_secret_access_key = credentials['SecretAccessKey'],
         aws_session_token = credentials['SessionToken']
     )
 
-    send_to_queue(sqs_resource, data)
-
+    send_to_queue(data, queue_url, sqs_resource)
 
 @retry()
 def db_add_nlb_record(db_item, table_name):
@@ -250,7 +263,8 @@ def delete_db_entry(key_hash, key_range, table_name):
         print e
 
 
-def handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url):
+def handle_nlb_delete(nlb_arn, nlb_name, table_name,
+                      queue_url, role_arn, external_id):
     """
     This method handles the delete workflow 
     associated with the case when an NLB has 
@@ -270,8 +284,15 @@ def handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url):
         print("Nothing to be done.")
     elif err_code == 0:
         db_item = parse_and_create_nlb_data('DEL-NLB', response.get('DNS-NAME'), False)
-        # send delete message
-        send_to_queue(db_item, queue_url)
+
+        # Secondly, send a message out on the queue
+        if role_arn:
+            print("[handle_nlb_delete] Role ARN specified. Calling handle_")
+            assume_role_and_send_to_queue(role_arn, db_item, queue_url, external_id)
+        else:
+            print("[hanlde_nlb_delete] Send to queue in same account.")
+            send_to_queue(db_item, queue_url, None)
+
         # delete it from the database
         delete_db_entry(nlb_arn, nlb_name, table_name)
     else:
@@ -293,7 +314,8 @@ def get_subnet_info(nlb_response):
 
 
 
-def handle_nlb_add(nlb_response, table_name, queue_url):
+def handle_nlb_add(nlb_response, table_name,
+                   queue_url, role_arn, external_id):
     """
     This method handles the add nlb workflow 
     to identify a new NLB and publish the information 
@@ -323,7 +345,12 @@ def handle_nlb_add(nlb_response, table_name, queue_url):
     db_add_nlb_record(final_nlb_data, table_name)
 
     # Secondly, send a message out on the queue
-    send_to_queue(final_nlb_data, queue_url)
+    if role_arn:
+        print("[handle_nlb_add] Role ARN specified. Calling handle_")
+        assume_role_and_send_to_queue(role_arn, final_nlb_data, queue_url, external_id)
+    else:
+        print("[hanlde_nlb_add] Send to queue in same account.")
+        send_to_queue(final_nlb_data, queue_url, None)
     print("****************** handle nlb add  END **************")
 
 
@@ -425,7 +452,9 @@ def resolve_nlb_ip(nlb_dns):
     print("[resolve_nlb_ip] IP Addresses of the NLB are: {}".format(ips))
     return ips
 
-def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url):
+def identify_and_handle_nlb_state(nlb_arn, nlb_name,
+                                  table_name, queue_url,
+                                  role_arn, external_id):
     """
     Identify the various states of interest with regards
     to the NLB deployment. 
@@ -442,14 +471,15 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url):
         )
     except Exception, e:
         print("\n\nNLB: (ARN: {} Name: {}) is not found. Possibly been deleted.\n\n".format(nlb_arn, nlb_name))
-        handle_nlb_delete(nlb_arn, nlb_name, table_name, queue_url)
+        handle_nlb_delete(nlb_arn, nlb_name, table_name,
+                          queue_url, role_arn, external_id)
         return
 
     print("Identify the scenario....")
     parsed_response = parse_and_create_nlb_data(None, nlb_response, True)
     ret_code, err_code, response = check_db_entry(parsed_response.get('NLB-ARN'), parsed_response.get('NLB-NAME'), table_name)
     if err_code == 1:
-        handle_nlb_add(nlb_response, table_name, queue_url)
+        handle_nlb_add(nlb_response, table_name, queue_url, role_arn, external_id)
     elif err_code == 2:
         print("This is the exception case. Error occurred while retrieving data from the database.")
     else:
@@ -464,20 +494,20 @@ def nlb_lambda_handler(event, context):
     :param context: 
     :return: 
     """
-    assume_role = False
+
     print event, context
 
     table_name = event['table_name']
     nlb_arn = event['NLB-ARN']
     nlb_name = event['NLB-NAME']
     queue_url = event['QueueURL']
+    role_arn = event['RoleARN']
+    external_id = event['ExternalId']
 
     try:
-        if assume_role:
-            assume_role_and_dispatch(event['RoleArn'], data)
-            assume_role_and_dispatch('arn:aws:iam::140651570565:role/nlb_sqs_perms', data)
-        else:
-            identify_and_handle_nlb_state(nlb_arn, nlb_name, table_name, queue_url)
+        identify_and_handle_nlb_state(nlb_arn, nlb_name,
+                                      table_name, queue_url,
+                                      role_arn, external_id)
     except Exception, e:
         print e
     finally:
