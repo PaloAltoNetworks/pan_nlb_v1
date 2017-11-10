@@ -54,6 +54,15 @@
       "Description": "The external ID associated with the Cross Account Role",
       "MaxLength" : "120"
     },
+    "SameAccount": {
+      "Type": "String",
+      "Default": "true",
+      "Description": "Flag to indicate if the NLB will be deployed into the same account or a different one",
+      "AllowedValues": [
+        "true",
+        "false"
+      ]
+    }
   },
   "Metadata" : {
     "AWS::CloudFormation::Interface" : {
@@ -67,9 +76,174 @@
       }
     }
   },
+  "Conditions": {
+    "CreateCrossAccountRole": {"Fn::Equals" : [{"Ref": "SameAccount"}, "false"] },
+    "NoCrossAccountRole": {"Fn::Equals" : [{"Ref": "SameAccount"}, "true"] }
+  },
   "Resources": {
-    "LambdaExecutionRole" : {
+    "LambdaExecutionRole0" : {
         "Type": "AWS::IAM::Role",
+        "Condition": "NoCrossAccountRole",
+        "Properties": {
+            "AssumeRolePolicyDocument": {
+               "Version": "2012-10-17",
+               "Statement": [ {
+                 "Effect": "Allow",
+                 "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              } ]
+            },
+            "Path":"/",
+            "Policies": [ {
+              "PolicyName": "LambdaExecutionRolePolicy",
+              "PolicyDocument":{
+                "Version": "2012-10-17",
+                "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:ListBucket",
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", {"Ref": "S3BucketName" }, "/*" ] ] }
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:GetObject",
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "ec2:DescribeSubnets"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "events:*"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "cloudwatch:*"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "lambda:AddPermission",
+                        "lambda:CreateEventSourceMapping",
+                        "lambda:CreateFunction",
+                        "lambda:DeleteEventSourceMapping",
+                        "lambda:DeleteFunction",
+                        "lambda:GetEventSourceMapping",
+                        "lambda:ListEventSourceMappings",
+                        "lambda:RemovePermission",
+                        "lambda:UpdateEventSourceMapping",
+                        "lambda:UpdateFunctionCode",
+                        "lambda:UpdateFunctionConfiguration",
+                        "lambda:GetFunction",
+                        "lambda:ListFunctions"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:ReceiveMessage",
+                        "sqs:SendMessage",
+                        "sqs:SetQueueAttributes",
+                        "sqs:PurgeQueue"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "elasticloadbalancing:AddTags",
+                        "elasticloadbalancing:AttachLoadBalancerToSubnets",
+                        "elasticloadbalancing:ConfigureHealthCheck",
+                        "elasticloadbalancing:DescribeInstanceHealth",
+                        "elasticloadbalancing:DescribeLoadBalancerAttributes",
+                        "elasticloadbalancing:DescribeLoadBalancerPolicyTypes",
+                        "elasticloadbalancing:DescribeLoadBalancerPolicies",
+                        "elasticloadbalancing:DescribeLoadBalancers",
+                        "elasticloadbalancing:DescribeTags",
+                        "elasticloadbalancing:DetachLoadBalancerFromSubnets",
+                        "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                        "elasticloadbalancing:RemoveTags"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "iam:PassRole",
+                        "iam:GetRole"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["logs:CreateLogGroup","logs:CreateLogStream","logs:PutLogEvents"],
+                  "Resource": "arn:aws:logs:*:*:*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": ["cloudformation:DescribeStacks"],
+                  "Resource": "*"
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:PutDestination",
+                        "logs:PutDestinationPolicy",
+                        "logs:PutLogEvents",
+                        "logs:PutMetricFilter"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "dynamodb:CreateTable",
+                        "dynamodb:DeleteItem",
+                        "dynamodb:DeleteTable",
+                        "dynamodb:GetItem",
+                        "dynamodb:PutItem"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                }
+                ]
+              }}]}
+    },
+    "LambdaExecutionRole1" : {
+        "Type": "AWS::IAM::Role",
+        "Condition": "CreateCrossAccountRole",
         "Properties": {
             "AssumeRolePolicyDocument": {
                "Version": "2012-10-17",
@@ -232,32 +406,75 @@
                 ]
               }}]}
     },
-    "NLBDeployerLambda" : {
+    "NLBDeployerLambda0" : {
         "Type": "AWS::Lambda::Function",
+        "Condition": "NoCrossAccountRole",
         "Properties": {
             "Handler": "nlb_deployer.nlb_deploy_handler",
-            "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },
+            "Role": {"Fn::GetAtt" :
+                      ["LambdaExecutionRole0",
+                        "Arn"
+                      ]
+            },
             "Code": {
                 "S3Bucket": { "Ref": "S3BucketName"},
                 "S3Key": { "Ref": "S3ObjectName"}
             },
         "Runtime": "python2.7",
         "Timeout": "300"
-      },
-      "DependsOn": [ "LambdaExecutionRole" ]
+      }
     },
-    "LambdaCustomResource": {
+    "NLBDeployerLambda1" : {
+        "Type": "AWS::Lambda::Function",
+        "Condition": "CreateCrossAccountRole",
+        "Properties": {
+            "Handler": "nlb_deployer.nlb_deploy_handler",
+            "Role": {"Fn::GetAtt" :
+                      ["LambdaExecutionRole1",
+                        "Arn"
+                      ]
+            },
+            "Code": {
+                "S3Bucket": { "Ref": "S3BucketName"},
+                "S3Key": { "Ref": "S3ObjectName"}
+            },
+        "Runtime": "python2.7",
+        "Timeout": "300"
+      }
+    },
+    "LambdaCustomResource0": {
         "Type": "AWS::CloudFormation::CustomResource",
+        "Condition": "NoCrossAccountRole",
         "Version" : "1.0",
-        "DependsOn": ['NLBDeployerLambda'],
+        "DependsOn": ['NLBDeployerLambda0'],
          "Properties" : {
-             "ServiceToken": { "Fn::GetAtt" : ["NLBDeployerLambda", "Arn"] },
+             "ServiceToken": { "Fn::GetAtt" : ["NLBDeployerLambda0", "Arn"] },
              "StackName": {"Ref": "AWS::StackName"},
              "Region": {"Ref": "AWS::Region"},
              "table_name": {"Ref": "TableName"},
              "NLB-ARN": {"Ref": "NLBARN"},
              "NLB-NAME": {"Ref": "NLBName"},
-             "LambdaExecutionRole": {"Ref": "LambdaExecutionRole"},
+             "LambdaExecutionRole": {"Ref": "LambdaExecutionRole0"},
+             "S3BucketName": {"Ref": "S3BucketName"},
+             "S3ObjectName": {"Ref": "S3ObjectName"},
+             "QueueURL": {"Ref": "QueueURL"},
+             "RoleARN": {"Ref": "RoleARN"},
+             "ExternalId": {"Ref": "ExternalId"}
+         }
+    },
+    "LambdaCustomResource1": {
+        "Type": "AWS::CloudFormation::CustomResource",
+        "Condition": "CreateCrossAccountRole",
+        "Version" : "1.0",
+        "DependsOn": ['NLBDeployerLambda1'],
+         "Properties" : {
+             "ServiceToken": { "Fn::GetAtt" : ["NLBDeployerLambda1", "Arn"] },
+             "StackName": {"Ref": "AWS::StackName"},
+             "Region": {"Ref": "AWS::Region"},
+             "table_name": {"Ref": "TableName"},
+             "NLB-ARN": {"Ref": "NLBARN"},
+             "NLB-NAME": {"Ref": "NLBName"},
+             "LambdaExecutionRole": {"Ref": "LambdaExecutionRole1"},
              "S3BucketName": {"Ref": "S3BucketName"},
              "S3ObjectName": {"Ref": "S3ObjectName"},
              "QueueURL": {"Ref": "QueueURL"},

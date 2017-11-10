@@ -103,6 +103,15 @@
       "Description": "The external ID associated with the Cross Account Role",
       "MaxLength" : "120"
     },
+    "SameAccount": {
+      "Type": "String",
+      "Default": "true",
+      "Description": "Flag to indicate if the NLB will be deployed into the same account or a different one",
+      "AllowedValues": [
+        "true",
+        "false"
+      ]
+    }
   },
   "Mappings" : {
     "Constants": {
@@ -517,7 +526,8 @@
                "S3ObjectName": {"Ref": "LambdaZipFileName"},
                "QueueURL": {"Ref": "QueueURL"},
                "RoleARN": {"Ref": "CrossAccountRole"},
-               "ExternalId" : {"Ref": "ExternalId"}
+               "ExternalId" : {"Ref": "ExternalId"},
+               "SameAccount" : {"Ref": "SameAccount"}
             }
       },
       "DependsOn": [ "NetworkLoadBalancer", "WebServerLaunchConfig", "WebServerListener" ]
