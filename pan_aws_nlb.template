@@ -258,7 +258,7 @@
             "files" : {
               "/var/www/html/index.html" : {
                 "content" : { "Fn::Join" : ["\n", [
-                  "<img src=\"https://www.paloaltonetworks.com/content/dam/pan/en_US/images/logos/brand/pan-logo-badge-blue-medium-kick-up.png\" alt=\"VM-Series CloudFormation\"/>",
+                  "<img src=\"https://www.paloaltonetworks.com/content/dam/pan/en_US/images/logos/brand/pan-logo-badge-blue-medium-kick-up.png\" alt=\"VM-Series CloudFormation\ width=\"200\"/>",
                   "<h1>Congratulations, you have successfully launched VM-Series ASG CloudFormation. This file is coming from Webserver Region:", { "Ref" : "AWS::Region" }, "</h1>",
                   "<h1>StackID: ", { "Ref" : "AWS::StackId" }, "</h1>",
                   "<h1>StackName: ", { "Ref" : "AWS::StackName" }, "</h1>",
