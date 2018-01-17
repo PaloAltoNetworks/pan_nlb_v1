@@ -145,7 +145,7 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
     # time.sleep(5)
     logger.info('Getting IAM role')
     lambda_exec_role_arn = iam.get_role(RoleName=lambda_execution_role_name).get('Role').get('Arn')
-    lambda_func_name = stackname + '-lambda-nlb-handler'
+    lambda_func_name = stackname[:38] + '-lambda-nlb-handler'
     logger.info('creating lambda function: ' + lambda_func_name)
     response = lambda_client.create_function(
         FunctionName=lambda_func_name,
