@@ -61,7 +61,7 @@
       "Type" : "String",
       "Description": "Enter the URL of the Queue to send NLB updates to",
       "MinLength" : "3",
-      "MaxLength" : "120"
+      "MaxLength" : "1024"
     },
     "S3BucketName": {
       "Type" : "String",
