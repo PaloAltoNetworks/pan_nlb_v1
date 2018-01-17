@@ -20,7 +20,7 @@
       "Type" : "String",
       "Description": "Enter the URL of the Queue to send messages to",
       "MinLength" : "3",
-      "MaxLength" : "120"
+      "MaxLength" : "1024"
     },
     "TableName": {
       "Type" : "String",
