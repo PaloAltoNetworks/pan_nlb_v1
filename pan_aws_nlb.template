@@ -22,7 +22,7 @@
        "Type" : "AWS::EC2::KeyPair::KeyName"
     },
     "SSHLocation" : {
-      "Description" : "Restrict SSH access to the VM-Series firewall (by default can be accessed from anywhere)",
+      "Description" : "Restrict SSH access to the VM-Series firewall. Recommend to specify IP / CIDR of the NAT GW in the security VPC.",
       "Type" : "String",
       "MinLength": "9",
       "MaxLength": "18",

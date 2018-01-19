@@ -140,7 +140,6 @@ def send_to_queue(data, queue_url, _sts_sqs_client):
             }
         )
 
-
 def assume_role_and_send_to_queue(role_arn, data, queue_url, external_id):
     """
 
@@ -166,102 +165,6 @@ def assume_role_and_send_to_queue(role_arn, data, queue_url, external_id):
     )
 
     send_to_queue(data, queue_url, sqs_resource)
-
-@retry()
-def db_add_nlb_record(db_item, table_name):
-    """
-    Add a new entry into the db
-    :param data: 
-    :return: 
-    """
-
-    print("[db_add_nlb_record] Adding item: {}".format(db_item))
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(table_name)
-    table.put_item(
-        Item=db_item
-    )
-
-
-def check_db_entry(key_hash, key_range, table_name):
-    """
-    Check if an NLB specified by the key 
-    parameter exists in the DB.
-    
-    :param key: 
-    :return: 
-    """
-    print "key_hash: {} key_range: {}".format(key_hash, key_range)
-    ret_code, err_code, response = get_db_entry(key_hash, key_range, table_name)
-
-    return (ret_code, err_code, response)
-
-
-def get_db_entry(key_hash, key_range, table_name):
-    """
-    Retrieve a record corresponding to the key specified 
-    from the DB. 
-    
-    :param key_hash: 
-    :param key_range: 
-    :param table_name: 
-    :return: 
-    """
-
-    print("[get_db_entry] Retrieve items from the db: key_hash: {} key_range: {}".format(key_hash, key_range))
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(table_name)
-
-    try:
-        response = table.get_item(
-            Key={
-                'NLB-ARN': key_hash,
-                'NLB-NAME': key_range
-            }
-        )
-    except ClientError as e:
-        print("[get_db_entry]: Exception occurred: {}".format(e))
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            print('[get_db_entry]: ResourceNotFoundException occurred')
-            print("returning false 1 None")
-            return (False, 1, None)
-        else:
-            print("[get_db_entry] Unexpected exception occurred: {}".format(e))
-            return (False, 2, None)
-
-    print("No exceptions occurred while retrieving items from the database.")
-    print("[get_db_entry] Response from db: {}".format(response))
-    if not response.get('Item', None):
-        # The case when there are no items in the database
-        print("There are no items in the database")
-        return (False, 1, None)
-    print("Response from db_get: {}".format(response))
-    return (True, 0, response.get('Item'))
-
-
-def delete_db_entry(key_hash, key_range, table_name):
-    """
-    Method to delete an entry identified by the key
-    specified.
-    
-    :param key_hash: 
-    :param key_range: 
-    :param table_name: 
-    :return: 
-    """
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(table_name)
-    print "Calling delete... {} {} ".format(key_hash, key_range)
-    try:
-        table.delete_item(
-            Key={
-                'NLB-ARN': key_hash,
-                'NLB-NAME': key_range
-            }
-        )
-    except Exception, e:
-        print e
-
 
 def handle_nlb_delete(nlb_arn, nlb_name, table_name,
                       queue_url, role_arn, external_id):
@@ -292,12 +195,8 @@ def handle_nlb_delete(nlb_arn, nlb_name, table_name,
         else:
             print("[hanlde_nlb_delete] Send to queue in same account.")
             send_to_queue(db_item, queue_url, None)
-
-        # delete it from the database
-        delete_db_entry(nlb_arn, nlb_name, table_name)
     else:
         print "Catch all case."
-
 
 def get_subnet_info(nlb_response):
 
@@ -311,8 +210,6 @@ def get_subnet_info(nlb_response):
     )
     print("Subnet data: {}".format(subnet_data))
     return subnet_data
-
-
 
 def handle_nlb_add(nlb_response, table_name,
                    queue_url, role_arn, external_id):
@@ -340,9 +237,6 @@ def handle_nlb_add(nlb_response, table_name,
     print("[handle_nlb_add] nlb ips: {} type: {}".format(ips, type(ips)))
 
     final_nlb_data = append_nlb_ip_data(db_item, ips, subnet_data)
-
-    # First add it to the database
-    db_add_nlb_record(final_nlb_data, table_name)
 
     # Secondly, send a message out on the queue
     if role_arn:
@@ -475,16 +369,7 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name,
                           queue_url, role_arn, external_id)
         return
 
-    print("Identify the scenario....")
-    parsed_response = parse_and_create_nlb_data(None, nlb_response, True)
-    ret_code, err_code, response = check_db_entry(parsed_response.get('NLB-ARN'), parsed_response.get('NLB-NAME'), table_name)
-    if err_code == 1:
-        handle_nlb_add(nlb_response, table_name, queue_url, role_arn, external_id)
-    elif err_code == 2:
-        print("This is the exception case. Error occurred while retrieving data from the database.")
-    else:
-        # This is essentially the NOOP case. i.e no changes to the NLB's
-        print("\n\nNLB (ARN: {} Name: {}) already exists in the DB. No changes to the deployment\n\n".format(nlb_arn, nlb_name))
+    handle_nlb_add(nlb_response, table_name, queue_url, role_arn, external_id)
 
 
 def nlb_lambda_handler(event, context):

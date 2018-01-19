@@ -65,65 +65,13 @@ def send_response(event, context, responseStatus):
         connection.close()
         return 'true'
 
-
 def get_event_rule_name(stackname):
     name = stackname + 'event-rule-nlb-lambda'
     return name[-63:len(name)]
 
-
 def get_target_id_name(stackname):
     name = stackname + '-nlb-lmda-target-id'
     return name[-63:len(name)]
-
-
-def create_dynamo_db(table_name):
-    """
-    Create and initialize dynamo db
-    :return: 
-    """
-
-    dynamodb = boto3.resource('dynamodb')
-
-    table = dynamodb.create_table(
-        TableName=table_name,
-        KeySchema=[
-            {
-                'AttributeName': 'NLB-ARN',
-                'KeyType': 'HASH'  # Partition key
-            },
-            {
-                'AttributeName': 'NLB-NAME',
-                'KeyType': 'RANGE'  # Sort key
-            }
-        ],
-        AttributeDefinitions=[
-            {
-                'AttributeName': 'NLB-ARN',
-                'AttributeType': 'S'
-            },
-            {
-                'AttributeName': 'NLB-NAME',
-                'AttributeType': 'S'
-            },
-
-        ],
-        ProvisionedThroughput={
-            'ReadCapacityUnits': 10,
-            'WriteCapacityUnits': 10
-        }
-    )
-
-
-def delete_dynamo_db_table(table_name):
-    """
-    
-    :param table_name: 
-    :return: 
-    """
-    dynamodb_client = boto3.client('dynamodb')
-    response = dynamodb_client.delete_table(TableName=table_name)
-    logger.info('[delete_dynamo_db_table]: Response: {}'.format(response))
-
 
 def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3BucketName, S3Object, table_name,
                                     NLB_ARN, NLB_NAME, QueueURL, RoleARN, ExternalId):
@@ -145,7 +93,8 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
     # time.sleep(5)
     logger.info('Getting IAM role')
     lambda_exec_role_arn = iam.get_role(RoleName=lambda_execution_role_name).get('Role').get('Arn')
-    lambda_func_name = stackname[:38] + '-lambda-nlb-handler'
+    truncated_names = stackname[:10] + stackname[-20:]
+    lambda_func_name = truncated_names + '-lambda-nlb-handler'
     logger.info('creating lambda function: ' + lambda_func_name)
     response = lambda_client.create_function(
         FunctionName=lambda_func_name,
@@ -164,7 +113,7 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
 
     response = lambda_client.add_permission(
         FunctionName=lambda_function_arn,
-        StatementId=stackname + '-lambda_add_perm',
+        StatementId= truncated_names + '-lambda_add_perm',
         Action='lambda:InvokeFunction',
         Principal='events.amazonaws.com',
         SourceArn=events_source_arn
@@ -216,7 +165,8 @@ def delete_lambda_function_artifacts(stackname, NLB_ARN):
 
     event_rule_name = get_event_rule_name(stackname)
     target_id_name = get_target_id_name(stackname)
-    lambda_func_name = stackname + '-lambda-nlb-handler'
+    truncated_names = stackname[:10] + stackname[-20:]
+    lambda_func_name = truncated_names + '-lambda-nlb-handler'
 
     # Remove the events target
     try:
@@ -243,24 +193,6 @@ def delete_lambda_function_artifacts(stackname, NLB_ARN):
     return False
 
 
-def create_service_deps(table_name):
-    """
-    Create the application artifacts necessary to 
-    achieve the objective of the lambda function 
-    deployment.
-
-    :param table_name:  
-    :return: 
-    """
-
-    # Create a dynamodb database and
-    # initialize the necessary tables
-    try:
-        create_dynamo_db(table_name)
-    except Exception, e:
-        print e
-
-
 def handle_stack_create(event, context):
 
     stackname = event['ResourceProperties']['StackName']
@@ -275,18 +207,20 @@ def handle_stack_create(event, context):
     ExternalId = event['ResourceProperties']['ExternalId']
 
     try:
-        create_service_deps(table_name)
         deploy_and_configure_nlb_lambda(stackname, lambda_execution_role,
                                         S3BucketName, S3Object,
                                         table_name, NLB_ARN, NLB_NAME,
                                         QueueURL,
                                         RoleARN,
                                         ExternalId)
+        send_response(event, context, "SUCCESS")
+        print("Successfully completed the lambda function deployment and execution.")
     except Exception, e:
         print e
+        print("Failure encountered during lambda function deployment and execution.")
+        send_response(event, context, "FAILED")
     finally:
-        print("Successfully completed the lambda function deployment and execution.")
-        send_response(event, context, "SUCCESS")
+        print("Returning from lambda function deployment and execution.")
 
 
 def handle_stack_delete(event, context):
@@ -309,12 +243,10 @@ def handle_stack_delete(event, context):
         delete_lambda_function_artifacts(stackname, NLB_ARN)
         pan_dnd.handle_nlb_delete(NLB_ARN, NLB_NAME, table_name,
                                   QueueURL, RoleARN, ExternalId)
-        delete_dynamo_db_table(table_name)
     except Exception, e:
         print("[handle_stack_delete] Exception occurred: {}".format(e))
     finally:
         send_response(event, context, "SUCCESS")
-
 
 def nlb_deploy_handler(event, context):
     """
@@ -332,7 +264,4 @@ def nlb_deploy_handler(event, context):
         handle_stack_delete(event, context)
     elif event['RequestType'] == 'Create':
         handle_stack_create(event, context)
-
-
-
 
