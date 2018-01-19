@@ -111,6 +111,7 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
     logger.info('Lambda function created...')
     lambda_function_arn = response.get('FunctionArn')
 
+    logger.info('StatementId: {}'.format(truncated_names + '-lambda_add_perm'))
     response = lambda_client.add_permission(
         FunctionName=lambda_function_arn,
         StatementId= truncated_names + '-lambda_add_perm',
