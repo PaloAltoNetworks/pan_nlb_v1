@@ -18,6 +18,7 @@ sqs_client = boto3.client('sqs')
 sts_client = boto3.client('sts')
 ec2_client = boto3.client('ec2')
 sts_client = boto3.client('sts')
+s3_client = boto3.client('s3')
 
 def retry(delays=(0, 1, 5, 30),
           exception=Exception,
@@ -167,7 +168,7 @@ def assume_role_and_send_to_queue(role_arn, data, queue_url, external_id):
     send_to_queue(data, queue_url, sqs_resource)
 
 def handle_nlb_delete(nlb_arn, nlb_name, table_name,
-                      queue_url, role_arn, external_id):
+                      queue_url, role_arn, external_id, dns_name):
     """
     This method handles the delete workflow 
     associated with the case when an NLB has 
@@ -181,22 +182,15 @@ def handle_nlb_delete(nlb_arn, nlb_name, table_name,
     :return: 
     """
 
-    ret_code, err_code, response = get_db_entry(nlb_arn, nlb_name, table_name)
-    print('Response from db: {}'.format(response))
-    if err_code == 1:
-        print("Nothing to be done.")
-    elif err_code == 0:
-        db_item = parse_and_create_nlb_data('DEL-NLB', response.get('DNS-NAME'), False)
+    db_item = parse_and_create_nlb_data('DEL-NLB', dns_name, False)
 
-        # Secondly, send a message out on the queue
-        if role_arn:
-            print("[handle_nlb_delete] Role ARN specified. Calling handle_")
-            assume_role_and_send_to_queue(role_arn, db_item, queue_url, external_id)
-        else:
-            print("[hanlde_nlb_delete] Send to queue in same account.")
-            send_to_queue(db_item, queue_url, None)
+    # Secondly, send a message out on the queue
+    if role_arn:
+        print("[handle_nlb_delete] Role ARN specified. Calling handle_")
+        assume_role_and_send_to_queue(role_arn, db_item, queue_url, external_id)
     else:
-        print "Catch all case."
+        print("[hanlde_nlb_delete] Send to queue in same account.")
+        send_to_queue(db_item, queue_url, None)
 
 def get_subnet_info(nlb_response):
 
@@ -211,8 +205,21 @@ def get_subnet_info(nlb_response):
     print("Subnet data: {}".format(subnet_data))
     return subnet_data
 
-def handle_nlb_add(nlb_response, table_name,
-                   queue_url, role_arn, external_id):
+def get_object_name(stack_name):
+    """
+    Construct and return the object name based
+    on the stack name. 
+    """
+    truncated_names = stack_name[:10] + stack_name[-20:]
+    final_object_name = truncated_names.lower() + 'nlb' 
+    return final_object_name
+
+def handle_nlb_add(nlb_response, 
+                   bucket_name,
+                   stack_name,
+                   table_name,
+                   queue_url, role_arn, 
+                   external_id):
     """
     This method handles the add nlb workflow 
     to identify a new NLB and publish the information 
@@ -223,6 +230,7 @@ def handle_nlb_add(nlb_response, table_name,
     :param table_name: 
     :return: 
     """
+   
     print("****************** handle nlb add  START **************")
     print("[handle_nlb_add] NLB details: {}".format(nlb_response))
 
@@ -346,9 +354,39 @@ def resolve_nlb_ip(nlb_dns):
     print("[resolve_nlb_ip] IP Addresses of the NLB are: {}".format(ips))
     return ips
 
+def desc_nlb_tags(nlb_arn):
+    """
+
+    """
+    resp = lb_client.describe_tags(ResourceArns=[nlb_arn])
+    tag = resp.get('TagDescriptions', None)
+    print("NLB Tags: {}".format(tag))
+    if tag:
+        nlb_tag = tag[0]
+        print("NLB tag: {}".format(nlb_tag))
+        actual_tag = nlb_tag.get('Tags')
+        if not actual_tag:
+            print("Tag is empty: {}".format(actual_tag))
+            return False
+        else:
+            print("Tag is populated: {}".format(actual_tag))
+            return True
+    print("Returning False in base condition.")
+    return False
+
+def add_nlb_tags(nlb_arn):
+    """
+
+    """
+    lb_client.add_tags(ResourceArns=[nlb_arn], 
+                       Tags=[{'Key': 'NLB0192837465', 'Value': 'NLB Stack'}])
+
 def identify_and_handle_nlb_state(nlb_arn, nlb_name,
+                                  stack_name,
+                                  bucket_name, 
                                   table_name, queue_url,
-                                  role_arn, external_id):
+                                  role_arn, external_id, 
+                                  dns_name):
     """
     Identify the various states of interest with regards
     to the NLB deployment. 
@@ -366,10 +404,20 @@ def identify_and_handle_nlb_state(nlb_arn, nlb_name,
     except Exception, e:
         print("\n\nNLB: (ARN: {} Name: {}) is not found. Possibly been deleted.\n\n".format(nlb_arn, nlb_name))
         handle_nlb_delete(nlb_arn, nlb_name, table_name,
-                          queue_url, role_arn, external_id)
+                          queue_url, role_arn, external_id,
+                          dns_name)
         return
 
-    handle_nlb_add(nlb_response, table_name, queue_url, role_arn, external_id)
+    ret = desc_nlb_tags(nlb_arn)
+    if not ret:
+        print("Adding the discovered NLB")        
+        add_nlb_tags(nlb_arn)
+    else:
+        print("NLB already added. Nothing to do")
+        return
+        
+    handle_nlb_add(nlb_response, bucket_name, stack_name, 
+                   table_name, queue_url, role_arn, external_id)
 
 
 def nlb_lambda_handler(event, context):
@@ -388,17 +436,21 @@ def nlb_lambda_handler(event, context):
     queue_url = event['QueueURL']
     role_arn = event['RoleARN']
     external_id = event['ExternalId']
+    bucket_name = event['S3BucketName']
+    dns_name = event['DNS-NAME']
+    stack_name = event['stack_name']
 
     try:
         identify_and_handle_nlb_state(nlb_arn, nlb_name,
+                                      stack_name,
+                                      bucket_name,
                                       table_name, queue_url,
-                                      role_arn, external_id)
+                                      role_arn, external_id,
+                                      dns_name)
     except Exception, e:
         print e
     finally:
         print("Successfully completed the lambda function deployment and execution.")
-
-
 
 if __name__ == "__main__":
     nlb_lambda_handler(None, None)

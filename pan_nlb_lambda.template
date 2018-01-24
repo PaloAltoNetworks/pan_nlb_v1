@@ -62,7 +62,11 @@
         "true",
         "false"
       ]
-    }
+    },
+   "Region": {
+     "Type": "String",
+     "Description": "Region into which the S3 bucket will be created"
+   }
   },
   "Metadata" : {
     "AWS::CloudFormation::Interface" : {
@@ -109,6 +113,16 @@
                 {
                     "Effect": "Allow",
                     "Action": "s3:GetObject",
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:PutObject",
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:ListObject",
                     "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
                 },
                 {
@@ -273,7 +287,17 @@
                 },
                 {
                     "Effect": "Allow",
+                    "Action": "s3:PutObject",
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", {"Ref": "S3BucketName" }, "/*" ] ] }
+                },
+                {
+                    "Effect": "Allow",
                     "Action": "s3:GetObject",
+                    "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
+                },
+                {
+                    "Effect": "Allow",
+                    "Action": "s3:ListObject",
                     "Resource": { "Fn::Join": [ "", [ "arn:aws:s3:::", { "Ref": "S3BucketName" }, "/*" ] ] }
                 },
                 {

@@ -6,8 +6,10 @@ import logging
 from urlparse import urlparse
 from contextlib import closing
 
+lb_client = boto3.client('elbv2')
 events_client = boto3.client('events')
 iam = boto3.client('iam')
+s3 = boto3.client('s3')
 lambda_client = boto3.client('lambda')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -74,7 +76,7 @@ def get_target_id_name(stackname):
     return name[-63:len(name)]
 
 def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3BucketName, S3Object, table_name,
-                                    NLB_ARN, NLB_NAME, QueueURL, RoleARN, ExternalId):
+                                    NLB_ARN, NLB_NAME, QueueURL, RoleARN, ExternalId, dns_name):
     """
     
     :param event: 
@@ -93,8 +95,10 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
     # time.sleep(5)
     logger.info('Getting IAM role')
     lambda_exec_role_arn = iam.get_role(RoleName=lambda_execution_role_name).get('Role').get('Arn')
+
     truncated_names = stackname[:10] + stackname[-20:]
     lambda_func_name = truncated_names + '-lambda-nlb-handler'
+
     logger.info('creating lambda function: ' + lambda_func_name)
     response = lambda_client.create_function(
         FunctionName=lambda_func_name,
@@ -129,7 +133,10 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
         'table_name': table_name,
         'QueueURL' : QueueURL,
         'RoleARN': RoleARN,
-        'ExternalId': ExternalId
+        'ExternalId': ExternalId,
+        'S3BucketName': S3BucketName,
+        'DNS-NAME': dns_name,
+	'stack_name': stackname
     }
 
     target_id_name = get_target_id_name(stackname)
@@ -206,6 +213,24 @@ def handle_stack_create(event, context):
     QueueURL = event['ResourceProperties']['QueueURL']
     RoleARN = event['ResourceProperties']['RoleARN']
     ExternalId = event['ResourceProperties']['ExternalId']
+    Region = event['ResourceProperties']['Region']
+
+    try:
+        nlb_response = lb_client.describe_load_balancers(
+            LoadBalancerArns=[NLB_ARN]
+        )
+    except Exception, e:
+        print("Exception occurred: {}".format(e))
+        print("\n\nNLB: (ARN: {} Name: {}) is not found.\n\n".format(NLB_ARN, NLB_NAME))
+        send_response(event, context, "FAILED")
+        return
+
+    # process the NLB data and extract the DNS name
+
+    dns_name = None
+    load_balancers = nlb_response.get('LoadBalancers')
+    for nlb in load_balancers:
+        dns_name = nlb.get('DNSName', None)
 
     try:
         deploy_and_configure_nlb_lambda(stackname, lambda_execution_role,
@@ -213,7 +238,7 @@ def handle_stack_create(event, context):
                                         table_name, NLB_ARN, NLB_NAME,
                                         QueueURL,
                                         RoleARN,
-                                        ExternalId)
+                                        ExternalId, dns_name)
         send_response(event, context, "SUCCESS")
         print("Successfully completed the lambda function deployment and execution.")
     except Exception, e:
@@ -239,11 +264,30 @@ def handle_stack_delete(event, context):
     QueueURL = event['ResourceProperties']['QueueURL']
     RoleARN = event['ResourceProperties']['RoleARN']
     ExternalId = event['ResourceProperties']['ExternalId']
+    Region = event['ResourceProperties']['Region']
+
+    try:
+        nlb_response = lb_client.describe_load_balancers(
+            LoadBalancerArns=[NLB_ARN]
+        )
+    except Exception, e:
+        print("Exception occurred: {}".format(e))
+        print("\n\nNLB: (ARN: {} Name: {}) is not found.\n\n".format(NLB_ARN, NLB_NAME))
+        send_response(event, context, "FAILED")
+        return
+
+    # process the NLB data and extract the DNS name
+
+    dns_name = None
+    load_balancers = nlb_response.get('LoadBalancers')
+    for nlb in load_balancers:
+        dns_name = nlb.get('DNSName', None)
+
 
     try:
         delete_lambda_function_artifacts(stackname, NLB_ARN)
         pan_dnd.handle_nlb_delete(NLB_ARN, NLB_NAME, table_name,
-                                  QueueURL, RoleARN, ExternalId)
+                                  QueueURL, RoleARN, ExternalId, dns_name)
     except Exception, e:
         print("[handle_stack_delete] Exception occurred: {}".format(e))
     finally:

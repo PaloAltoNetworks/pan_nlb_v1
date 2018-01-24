@@ -537,7 +537,8 @@
                "QueueURL": {"Ref": "QueueURL"},
                "RoleARN": {"Ref": "CrossAccountRole"},
                "ExternalId" : {"Ref": "ExternalId"},
-               "SameAccount" : {"Ref": "SameAccount"}
+               "SameAccount" : {"Ref": "SameAccount"},
+               "Region": {"Ref": "AWS::Region"}
             }
       },
       "DependsOn": [ "NetworkLoadBalancer", "WebServerLaunchConfig", "WebServerListener" ]
