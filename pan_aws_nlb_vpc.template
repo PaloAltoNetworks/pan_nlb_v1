@@ -28,17 +28,6 @@
       "MaxLength": "75",
       "Default" : "panwVPC"
     },
-    "NLBScheme" : {
-      "Description" : "Scheme associated with the NLB. Ex: internet-facing or internal",
-      "Type" : "String",
-      "MinLength": "6",
-      "MaxLength": "30",
-      "Default" : "internet-facing",
-      "AllowedValues": [
-        "internet-facing",
-        "internal"
-      ]
-    },
     "VPCCIDR": {
       "Type": "String",
       "Default": "192.168.0.0/16",
@@ -366,7 +355,7 @@
       "Properties" : {
         "Name" : { "Ref" : "NLBName" },
         "Subnets" : [ {"Ref": "NLBSubnet1"}, {"Ref": "NLBSubnet2"} ],
-        "Scheme" : { "Ref": "NLBScheme" },
+        "Scheme" : "internet-facing",
         "Type": "network"
       },
       "DependsOn": [ "NetworkLoadBalancerSecurityGroup" ]
