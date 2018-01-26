@@ -145,7 +145,9 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
     # time.sleep(5)
     logger.info('Getting IAM role')
     lambda_exec_role_arn = iam.get_role(RoleName=lambda_execution_role_name).get('Role').get('Arn')
-    lambda_func_name = stackname[:38] + '-lambda-nlb-handler'
+    truncated_names = stackname[:10] + stackname[-20:]
+    lambda_func_name = truncated_names + '-lambda-nlb-handler'
+
     logger.info('creating lambda function: ' + lambda_func_name)
     response = lambda_client.create_function(
         FunctionName=lambda_func_name,
@@ -162,9 +164,10 @@ def deploy_and_configure_nlb_lambda(stackname, lambda_execution_role_name, S3Buc
     logger.info('Lambda function created...')
     lambda_function_arn = response.get('FunctionArn')
 
+    logger.info('StatementId: {}'.format(truncated_names + '-lambda_add_perm'))
     response = lambda_client.add_permission(
         FunctionName=lambda_function_arn,
-        StatementId=stackname + '-lambda_add_perm',
+        StatementId=truncated_names + '-lambda_add_perm',
         Action='lambda:InvokeFunction',
         Principal='events.amazonaws.com',
         SourceArn=events_source_arn
@@ -216,7 +219,8 @@ def delete_lambda_function_artifacts(stackname, NLB_ARN):
 
     event_rule_name = get_event_rule_name(stackname)
     target_id_name = get_target_id_name(stackname)
-    lambda_func_name = stackname + '-lambda-nlb-handler'
+    truncated_names = stackname[:10] + stackname[-20:]
+    lambda_func_name = truncated_names + '-lambda-nlb-handler'
 
     # Remove the events target
     try:
@@ -282,11 +286,13 @@ def handle_stack_create(event, context):
                                         QueueURL,
                                         RoleARN,
                                         ExternalId)
-    except Exception, e:
-        print e
-    finally:
-        print("Successfully completed the lambda function deployment and execution.")
         send_response(event, context, "SUCCESS")
+        print("Successfully completed the lambda function deployment and execution.")
+    except Exception, e:
+        print("Failure encountered during lambda function deployment and execution.")
+        send_response(event, context, "FAILED")
+    finally:
+        print("Returning from lambda function deployment and execution.")
 
 
 def handle_stack_delete(event, context):
