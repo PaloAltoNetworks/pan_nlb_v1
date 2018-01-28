@@ -58,13 +58,18 @@
       "MaxLength" : "1024"
     },
     "SSHLocation" : {
-      "Description" : "Restrict SSH access to the VM-Series firewall (by default can be accessed from anywhere)",
+      "Description" : "Restrict SSH & HTTPS access to the Web Servers (by default can be accessed from anywhere)",
       "Type" : "String",
       "MinLength": "9",
       "MaxLength": "18",
       "Default" : "0.0.0.0/0",
       "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
       "ConstraintDescription" : "must be a valid CIDR range of the form x.x.x.x/x."
+    },
+    "NATGatewayAddresses" : {
+      "Description" : "Restrict HTTP Access to the NAT-Gateway Public IP Addresses (by default can be accessed from anywhere)",
+      "Type" : "CommaDelimitedList",
+      "Default" : "1.1.1.1/32, 2.2.2.2/32"
     },
     "S3BucketName": {
       "Type" : "String",
@@ -212,7 +217,7 @@
             },
             {
                 "Label": {"default": "Access Section"},
-                "Parameters": ["KeyName", "SSHLocation"]
+                "Parameters": ["KeyName", "SSHLocation", "NATGatewayAddresses"]
             }
         ],
         "ParameterLabels" : {
@@ -222,6 +227,7 @@
             "InstanceType": {"default": "Instance Type of Web Servers behind ILB:"},
             "KeyName": {"default": "Key pair:"},
             "SSHLocation": {"default": "SSH From:"},
+            "NATGatewayAddresses": {"default": "HTTP Access:"},
             "VpcAzs": {"default": "Select list of AZ:"},
             "NumberOfAZs": {"default": "Number of AZ for deployment:"},
             "ScalingParameter": {"default": "Choose your Scaling Parameter:"},
@@ -464,7 +470,13 @@
             "IpProtocol": "-1",
             "FromPort": "-1",
             "ToPort": "-1",
-            "CidrIp": { "Ref" : "VPCCIDR" }
+            "CidrIp": { "Fn::Select" : [ "0", {"Ref" : "NATGatewayAddresses"} ] } 
+          },
+          {
+            "IpProtocol": "-1",
+            "FromPort": "-1",
+            "ToPort": "-1",
+            "CidrIp": { "Fn::Select" : [ "1", {"Ref" : "NATGatewayAddresses"} ] }
           }
         ]
      }
